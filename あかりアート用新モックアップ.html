@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TU-NA-GU マイページ型プロトタイプ</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        /* ベースデザイン：美濃の夜（ダークモード） */
+        body {
+            background-color: #111; color: #fdf5e6;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            margin: 0; padding: 0;
+        }
+        .container { max-width: 480px; margin: 0 auto; padding: 20px; padding-bottom: 80px; }
+        
+        /* 作品ページ UI */
+        .work-img { width: 100%; height: 250px; background: url('https://images.unsplash.com/photo-1543007630-9710e4a00a20?q=80&w=600&fit=crop') center/cover; border-radius: 12px; margin-bottom: 20px; }
+        .tag { color: #d4af37; font-family: monospace; font-size: 14px; }
+        h1 { margin: 5px 0 15px 0; font-size: 24px; }
+        .desc { color: #aaa; line-height: 1.6; font-size: 15px; margin-bottom: 30px; }
+        
+        /* ライトいいねボタン */
+        .btn-light-vote {
+            background: transparent; border: 2px solid #d4af37; color: #d4af37;
+            width: 100%; padding: 15px; border-radius: 8px; font-size: 16px; font-weight: bold;
+            display: flex; justify-content: center; align-items: center; gap: 10px; cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-light-vote.voted { background: #d4af37; color: #111; }
+
+        /* マイページ UI (初期は非表示) */
+        #my-page { display: none; }
+        .status-box { background: #222; padding: 20px; border-radius: 12px; margin-bottom: 20px; border-top: 3px solid #d4af37; }
+        .progress-bar { width: 100%; height: 8px; background: #444; border-radius: 4px; margin-top: 10px; overflow: hidden; }
+        .progress-fill { height: 100%; background: #d4af37; width: 33%; transition: width 0.5s; }
+        
+        .history-list { list-style: none; padding: 0; margin: 0; }
+        .history-item { 
+            background: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 10px;
+            display: flex; justify-content: space-between; align-items: center; border: 1px solid #333;
+        }
+        .btn-real-vote {
+            background: #e63946; border: none; color: white; padding: 8px 15px; border-radius: 20px; font-weight: bold; cursor: pointer;
+        }
+        .btn-real-vote:disabled { background: #555; color: #888; cursor: not-allowed; }
+        
+        /* フローティング・ナビゲーション */
+        .nav-bar {
+            position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(17,17,17,0.9);
+            backdrop-filter: blur(10px); border-top: 1px solid #333; display: flex; justify-content: space-around; padding: 15px 0; z-index: 100;
+        }
+        .nav-item { color: #888; text-align: center; font-size: 12px; cursor: pointer; }
+        .nav-item.active { color: #d4af37; }
+        .nav-item i { font-size: 20px; display: block; margin-bottom: 5px; }
+        
+        /* 特典チケット表示 */
+        .ticket { display: none; background: linear-gradient(135deg, #d4af37, #f39c12); color: #111; padding: 15px; border-radius: 8px; text-align: center; font-weight: bold; margin-top: 20px; animation: pop 0.5s ease; }
+        @keyframes pop { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div id="work-page" class="container">
+        <div class="work-img"></div>
+        <span class="tag">W003</span>
+        <h1>月明かりの庭</h1>
+        <p class="desc">和紙の繊維が月光のように輝く、幽玄な造形。この作品に魅力を感じたら「ライトいいね」を押してください。（マイページに履歴が記録されます）</p>
+        
+        <button id="light-vote-btn" class="btn-light-vote" onclick="doLightVote()">
+            <i class="fa-solid fa-fire"></i> 心を灯す（ライトいいね）
+        </button>
+    </div>
+
+    <div id="my-page" class="container">
+        <h1>マイページ / 観賞記録</h1>
+        
+        <div class="status-box">
+            <div><i class="fa-solid fa-shoe-prints"></i> 観賞した作品: <span id="view-count">1</span> / 3</div>
+            <div class="progress-bar"><div id="progress" class="progress-fill"></div></div>
+            <p style="font-size:12px; color:#aaa; margin-top:10px;">あと2作品観賞すると、CartaMercatoで使える特典クーポンが発行されます！</p>
+        </div>
+        
+        <div id="reward-ticket" class="ticket">
+            <i class="fa-solid fa-ticket"></i> イタリアン屋台 100円引クーポン獲得！
+        </div>
+
+        <h2 style="font-size: 18px; margin-top:30px; border-bottom:1px solid #333; padding-bottom:10px;">
+            👑 あなたのグランプリを1つ選ぶ
+        </h2>
+        <p style="font-size:13px; color:#aaa;">これまでに見た作品の中から、最高の本命（リアルいいね：3pt）を1つだけ投票できます。</p>
+        
+        <ul class="history-list" id="history-list">
+            </ul>
+    </div>
+
+    <div class="nav-bar">
+        <div class="nav-item active" id="nav-work" onclick="switchTab('work')">
+            <i class="fa-solid fa-eye"></i> 作品を見る
+        </div>
+        <div class="nav-item" id="nav-my" onclick="switchTab('my')">
+            <i class="fa-solid fa-user"></i> マイページ
+        </div>
+    </div>
+
+    <script>
+        // --- 疑似的なローカルストレージ操作 ---
+        let hasVotedLight = false;
+        let realVoteId = null;
+        let history = [
+            { id: 'W001', title: '美濃の清流' },
+            { id: 'W003', title: '月明かりの庭' }
+        ]; // プロトタイプ用に最初から2つ履歴がある状態にする
+
+        // ライトいいねボタンの挙動
+        function doLightVote() {
+            const btn = document.getElementById('light-vote-btn');
+            if(!hasVotedLight) {
+                btn.classList.add('voted');
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> 心を灯しました！';
+                hasVotedLight = true;
+                alert('マイページに履歴が追加されました！');
+                // 実際はここでW003を履歴配列に追加し、スプシへ1pt送信する
+            }
+        }
+
+        // タブ切り替えとマイページの描画
+        function switchTab(tab) {
+            document.getElementById('work-page').style.display = tab === 'work' ? 'block' : 'none';
+            document.getElementById('my-page').style.display = tab === 'my' ? 'block' : 'none';
+            
+            document.getElementById('nav-work').classList.toggle('active', tab === 'work');
+            document.getElementById('nav-my').classList.toggle('active', tab === 'my');
+
+            if(tab === 'my') renderMyPage();
+        }
+
+        // マイページの描画ロジック
+        function renderMyPage() {
+            const list = document.getElementById('history-list');
+            list.innerHTML = '';
+            
+            history.forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'history-item';
+                
+                // 本命投票済みかどうかでボタンの状態を変える
+                const isVotedThis = (realVoteId === item.id);
+                const isVotedOther = (realVoteId !== null && realVoteId !== item.id);
+                
+                let btnHtml = `<button class="btn-real-vote" onclick="doRealVote('${item.id}')">👑 本命にする</button>`;
+                if (isVotedThis) btnHtml = `<button class="btn-real-vote" style="background:#d4af37; color:#111;" disabled>👑 投票済</button>`;
+                if (isVotedOther) btnHtml = `<button class="btn-real-vote" disabled>投票不可</button>`;
+
+                li.innerHTML = `<div><span class="tag">${item.id}</span><br><b>${item.title}</b></div>${btnHtml}`;
+                list.appendChild(li);
+            });
+
+            // スタンプラリー（プログレスバー）のシミュレーション
+            const count = history.length;
+            document.getElementById('view-count').innerText = count;
+            document.getElementById('progress').style.width = (count / 3 * 100) + '%';
+            
+            if (count >= 3) {
+                document.getElementById('reward-ticket').style.display = 'block';
+            }
+        }
+
+        // リアルいいね（グランプリ投票）の挙動
+        function doRealVote(id) {
+            if(confirm('グランプリ投票は1度しかできません。この作品に投票しますか？')) {
+                realVoteId = id;
+                renderMyPage();
+                alert('グランプリ投票（3pt）が完了しました！');
+                // 実際はここでスプシへ3pt送信する
+            }
+        }
+    </script>
+</body>
+</html>
